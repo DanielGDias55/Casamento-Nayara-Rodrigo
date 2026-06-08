@@ -347,6 +347,7 @@
         const firebaseConfig = {
             apiKey: "AIzaSyAhjYnxZnghkEYl54syxBjMQEN7zgQ63jo",
             authDomain: "casamento-nayara-e-rodrigo.firebaseapp.com",
+            databaseURL: "https://casamento-nayara-e-rodrigo-default-rtdb.firebaseio.com", // <-- LINHA ADICIONADA PARA O REALTIME DATABASE
             projectId: "casamento-nayara-e-rodrigo",
             storageBucket: "casamento-nayara-e-rodrigo.firebasestorage.app",
             messagingSenderId: "446079323299",
@@ -356,21 +357,14 @@
 
         // Inicialização do Firebase
         let app, auth, db;
-        let useLocalFallback = false;
-        let localRSVPs = [];
-
+        
         try {
-            if (firebaseConfig.apiKey === "COLE_SUA_API_KEY_AQUI") {
-                console.warn("Chaves do Firebase ausentes. O formulário não salvará na nuvem até que você configure o firebaseConfig.");
-                useLocalFallback = true;
-            } else {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getDatabase(app);
-            }
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getDatabase(app);
         } catch (error) {
             console.error("Erro ao inicializar Firebase:", error);
-            useLocalFallback = true;
+            alert("Erro ao conectar com Firebase: " + error.message);
         }
 
         let currentUser = null;
@@ -383,7 +377,7 @@
                 await signInAnonymously(auth);
             } catch (error) {
                 console.error("Erro na autenticação:", error);
-                useLocalFallback = true;
+                alert("Atenção: Ative o 'Login Anônimo' no Firebase Console! Erro: " + error.code);
             }
         };
 
@@ -444,26 +438,16 @@
             errorMsg.classList.add('hidden');
 
             try {
-                if (!useLocalFallback && db && currentUser) {
-                    const rsvpRef = ref(db, 'rsvps');
-                    await push(rsvpRef, {
-                        name: name,
-                        count: parseInt(count, 10),
-                        companions: companions,
-                        timestamp: serverTimestamp()
-                    });
-                } else {
-                    // Fallback visual caso falhe a conexão
-                    useLocalFallback = true;
-                    localRSVPs.push({
-                        id: Date.now().toString(),
-                        name: name,
-                        count: parseInt(count, 10),
-                        companions: companions,
-                        time: new Date()
-                    });
-                    await new Promise(resolve => setTimeout(resolve, 600));
-                }
+                if (!db) throw new Error("Banco de dados não inicializado.");
+                if (!currentUser) throw new Error("Usuário não autenticado. Ative o Login Anônimo no Firebase.");
+
+                const rsvpRef = ref(db, 'rsvps');
+                await push(rsvpRef, {
+                    name: name,
+                    count: parseInt(count, 10),
+                    companions: companions,
+                    timestamp: serverTimestamp()
+                });
 
                 rsvpForm.style.display = 'none';
                 document.getElementById('rsvpSuccess').style.display = 'flex';
@@ -471,6 +455,7 @@
 
             } catch (error) {
                 console.error("Erro ao salvar:", error);
+                alert("Erro ao enviar confirmação: " + error.message);
                 errorMsg.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path></svg> Confirmar Presença`;
@@ -522,10 +507,10 @@
                 adminPanel.style.display = 'block';
                 window.scrollTo(0, 0); 
                 
-                if (currentUser || useLocalFallback) {
+                if (currentUser) {
                     loadRSVPs();
                 } else {
-                    document.getElementById('adminTableBody').innerHTML = `<tr><td colspan="3" class="py-8 text-center text-red-500 text-xs">Aguardando conexão com o banco de dados...</td></tr>`;
+                    document.getElementById('adminTableBody').innerHTML = `<tr><td colspan="3" class="py-8 text-center text-red-500 text-xs">Aguardando conexão com o banco de dados... (Usuário não autenticado)</td></tr>`;
                 }
             } else {
                 passwordError.classList.remove('opacity-0');
@@ -591,8 +576,8 @@
         }
 
         function loadRSVPs() {
-            if (useLocalFallback || !db || !currentUser) {
-                renderAdminTable(localRSVPs);
+            if (!db || !currentUser) {
+                document.getElementById('adminTableBody').innerHTML = `<tr><td colspan="3" class="py-8 text-center text-red-500 text-xs">Erro: Banco de dados ou usuário não conectado.</td></tr>`;
                 return;
             }
             
@@ -614,12 +599,11 @@
                     renderAdminTable(rsvps);
                 }, (error) => {
                     console.error("Erro ao ler dados:", error);
-                    useLocalFallback = true;
-                    renderAdminTable(localRSVPs);
+                    alert("Erro ao ler do Firebase: " + error.message);
                 });
             } catch(e) {
-                useLocalFallback = true;
-                renderAdminTable(localRSVPs);
+                console.error("Exceção:", e);
+                alert("Erro interno: " + e.message);
             }
         }
 
