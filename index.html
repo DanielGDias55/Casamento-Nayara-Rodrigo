@@ -339,19 +339,19 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getDatabase, ref, push, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
         // ==========================================
         // CONFIGURAÇÃO DO BANCO DE DADOS (FIREBASE)
         // ==========================================
-        // *** PASSO 1: COLE SUAS CHAVES DO FIREBASE AQUI ***
         const firebaseConfig = {
-            apiKey: "COLE_SUA_API_KEY_AQUI",
-            authDomain: "COLE_SEU_AUTH_DOMAIN_AQUI",
-            projectId: "COLE_SEU_PROJECT_ID_AQUI",
-            storageBucket: "COLE_SEU_STORAGE_BUCKET_AQUI",
-            messagingSenderId: "COLE_SEU_SENDER_ID_AQUI",
-            appId: "COLE_SEU_APP_ID_AQUI"
+            apiKey: "AIzaSyAhjYnxZnghkEYl54syxBjMQEN7zgQ63jo",
+            authDomain: "casamento-nayara-e-rodrigo.firebaseapp.com",
+            projectId: "casamento-nayara-e-rodrigo",
+            storageBucket: "casamento-nayara-e-rodrigo.firebasestorage.app",
+            messagingSenderId: "446079323299",
+            appId: "1:446079323299:web:e31fb1a46447d432ffc316",
+            measurementId: "G-CSQB64Y5S9"
         };
 
         // Inicialização do Firebase
@@ -366,7 +366,7 @@
             } else {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
-                db = getFirestore(app);
+                db = getDatabase(app);
             }
         } catch (error) {
             console.error("Erro ao inicializar Firebase:", error);
@@ -445,16 +445,15 @@
 
             try {
                 if (!useLocalFallback && db && currentUser) {
-                    // *** PASSO 2: O NOME DA SUA TABELA NO FIREBASE SERÁ 'rsvps' ***
-                    const rsvpRef = collection(db, 'rsvps');
-                    await addDoc(rsvpRef, {
+                    const rsvpRef = ref(db, 'rsvps');
+                    await push(rsvpRef, {
                         name: name,
                         count: parseInt(count, 10),
                         companions: companions,
                         timestamp: serverTimestamp()
                     });
                 } else {
-                    // Fallback visual caso não tenha configurado o Firebase ainda
+                    // Fallback visual caso falhe a conexão
                     useLocalFallback = true;
                     localRSVPs.push({
                         id: Date.now().toString(),
@@ -597,19 +596,19 @@
                 return;
             }
             
-            const rsvpRef = collection(db, 'rsvps');
+            const rsvpRef = ref(db, 'rsvps');
             
             try {
-                unsubscribeRSVPs = onSnapshot(rsvpRef, (snapshot) => {
+                unsubscribeRSVPs = onValue(rsvpRef, (snapshot) => {
                     const rsvps = [];
-                    snapshot.forEach((doc) => {
-                        const data = doc.data();
+                    snapshot.forEach((childSnapshot) => {
+                        const data = childSnapshot.val();
                         rsvps.push({
-                            id: doc.id,
+                            id: childSnapshot.key,
                             name: data.name,
                             count: data.count || 1,
                             companions: data.companions || [],
-                            time: data.timestamp ? data.timestamp.toDate() : new Date()
+                            time: data.timestamp ? new Date(data.timestamp) : new Date()
                         });
                     });
                     renderAdminTable(rsvps);
